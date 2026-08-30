@@ -58,7 +58,7 @@ def dataset_bounds(conn: sqlite3.Connection) -> tuple[date, date]:
 def run_query(conn: sqlite3.Connection, intent: Intent) -> QueryResult:
     sql, params = build_query(intent)
     where = sql[len(_SELECT):-len(" ORDER BY datetime")]  # "" or " WHERE ..."
-    total = conn.execute(f"SELECT COUNT(*) FROM frames{where}", params).fetchone()[0]
+    total = conn.execute("SELECT COUNT(*) FROM frames" + where, params).fetchone()[0]
     rows = conn.execute(sql, params).fetchmany(SAMPLE_CAP)
 
     notes = []

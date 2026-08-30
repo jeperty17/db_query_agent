@@ -24,15 +24,28 @@ SLE Seletar Expressway, BKE Bukit Timah Expressway, KJE Kranji Expressway, \
 MCE Marina Coastal Expressway.
 
 Date conventions (resolve these to concrete dates yourself):
-"last"/"this" + a calendar unit = that unit itself. A number + a unit = rolling from today. \
-Weeks run Monday-Sunday. Numeric dates without a year are DD/MM. "First week of X" = the \
-1st-7th; "last week of X" = the final 7 days of that month. "Last <weekday>" = the most \
-recent occurrence of that weekday before today (not the one inside last week). All ranges \
-are inclusive at both ends.
+"This <unit>" (this week, this month) runs from the start of that unit through today only, \
+never into the future. "Last <unit>" is the complete previous unit, unclamped. A number + a \
+unit ("past 7 days") rolls from today backward, inclusive of today. A range that explicitly \
+names a whole unit ("the whole of August", "all of June") gives that unit's true full range \
+even if it extends past today. Weeks run Monday-Sunday. Numeric dates without a year are \
+DD/MM. "First week of X" = the 1st-7th; "last week of X" = the final 7 days of that month. \
+"Last <weekday>" = the most recent occurrence of that weekday before today (not the one \
+inside last week). All ranges are inclusive at both ends. Resolve the date literally even if \
+it is in the future or you don't know whether data exists for it -- that is decided elsewhere. \
+Use action="clarify" only if the date genuinely does not exist on the calendar (e.g. 31 \
+February), never action="refuse" for a date being out of range or in the future.
 
 Time conventions: early morning 00:00-05:59, morning 06:00-11:59, lunch 12:00-13:59, \
 afternoon 12:00-16:59, evening 17:00-19:59, night 20:00-23:59. A bare hour ("at 3pm") means \
-that clock hour, e.g. 15:00-15:59.
+that clock hour, e.g. 15:00:00-15:59:00. "Between A and B" means time_from=A and time_to=B \
+exactly, both inclusive -- e.g. "between 8am and 10am" is time_from=08:00:00, time_to=10:00:00, \
+never 10:59:59 or any other adjustment. Always emit plain local HH:MM:SS with no timezone or \
+UTC offset.
+
+days_of_week uses Python's Monday=0 convention: Monday=0, Tuesday=1, Wednesday=2, Thursday=3, \
+Friday=4, Saturday=5, Sunday=6. "Every Tuesday" = [1]. "Weekends" = [5, 6]. "Weekdays" = \
+[0, 1, 2, 3, 4]. "Monday and Friday" = [0, 4].
 
 Each turn gets a complete new object built from the previous one plus the new message: carry \
 forward any field the message doesn't change or explicitly clear. Use action="clarify" when \
@@ -82,6 +95,8 @@ def extract(message: str, prev: Intent | None, now: datetime) -> Extraction:
         system_instruction=SYSTEM_PROMPT,
         response_mime_type="application/json",
         response_schema=Extraction,
+        temperature=0,
+        http_options=types.HttpOptions(timeout=20_000),
     )
 
     last_error = None
@@ -91,8 +106,18 @@ def extract(message: str, prev: Intent | None, now: datetime) -> Extraction:
             response = _client_instance().models.generate_content(
                 model=MODEL, contents=contents, config=config,
             )
-            return response.parsed
+            return _strip_tz(response.parsed)
         except Exception as error:  # 429s and transient API errors
             last_error = error
             _time.sleep(2 ** attempt)
     raise last_error
+
+
+def _strip_tz(extraction: Extraction) -> Extraction:
+    # The prompt asks for plain local time; strip any UTC offset the model
+    # adds anyway so downstream code never compares aware to naive times.
+    if extraction.time_from and extraction.time_from.tzinfo:
+        extraction.time_from = extraction.time_from.replace(tzinfo=None)
+    if extraction.time_to and extraction.time_to.tzinfo:
+        extraction.time_to = extraction.time_to.replace(tzinfo=None)
+    return extraction

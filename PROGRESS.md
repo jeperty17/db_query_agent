@@ -228,3 +228,29 @@ intent: camera=['MCE'] date_from=2026-08-24 date_to=2026-08-30  # turn 3 (F2)
 Camera carried forward on turn 2, swapped while dates persisted on turn 3 —
 exactly the matrix's expected behaviour, end to end through real API calls.
 
+## Phase 9: extraction matrix tests (sections B-E)
+
+Added `tests/test_extraction.py`: 47 schema-enforced live cases assert the
+validated `Intent` for every date, time, recurrence, and combination case in
+matrix sections B-E. Extraction now uses `temperature=0`, an SDK HTTP timeout,
+and strips timezone annotations from otherwise local times. The database test
+fixture is pinned to `NOW_A` in a separate ignored database, so test row counts
+remain frozen after the real date advances. The count query no longer uses an
+f-string; placeholder counts remain the only query-builder interpolation.
+
+Proof:
+```
+$ python3 -m pytest -q tests/test_extraction.py::<five selected B cases>
+5 passed in 23.48s
+$ python3 -m pytest -q tests/test_extraction.py::<five selected B cases>
+5 passed in 18.26s
+$ python3 -m pytest -m 'not llm' -q
+42 passed
+```
+
+Limitation recorded rather than changing expectations: after the successful
+date batches, further live calls intermittently stalled or failed with Gemini
+`httpx.ConnectError` / DNS resolution in the sandbox. Individual B1/B2 reruns
+passed after the earlier transient failures. Sections C-E remain marked `llm`
+and ready to rerun with `python3 -m pytest tests/test_extraction.py -m llm` in
+an environment with stable Gemini access.
