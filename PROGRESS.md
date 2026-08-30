@@ -272,3 +272,16 @@ $ python3 -m pytest -m 'not llm' -q
 
 Live F/G execution is pending the same intermittent Gemini DNS/connectivity
 failure recorded in phase 9; no matrix expectation was changed.
+
+## Phase 11: response and ambiguity tests (sections H-I)
+
+Added response tests for capped full-range results, partial dataset coverage,
+valid zero-row results, out-of-range responses, and all five ambiguity cases.
+Only outcomes which require extraction are marked `llm`; response shaping is
+deterministic and runs against the pinned database fixture.
+
+Proof:
+```
+$ python3 -m pytest tests/test_responses.py -m 'not llm' -q
+3 passed, 6 deselected
+```
