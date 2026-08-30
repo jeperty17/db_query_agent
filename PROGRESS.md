@@ -24,3 +24,20 @@ $ python3 setup_db.py   # rerun, idempotent
 
 Decision: `frames.db` and `__pycache__/` added to `.gitignore` — a 65MB generated
 artifact doesn't belong in git; `setup_db.py` regenerates it in ~2s.
+
+## Phase 2: agent/intent.py
+
+`Intent` and `Extraction` as pydantic models (SPEC.md section 5 and 7, verbatim
+field lists — pydantic gives the Gemini SDK schema enforcement on `Extraction`
+later). The four outcome types (`QueryResult`, `Clarification`, `Refusal`,
+`OutOfRange`, section 12) are plain `@dataclass`es, not pydantic — they're
+internal containers built from Python data, never parsed from JSON or the
+network, so pydantic's validation buys nothing there. `Outcome` is a `Union`
+type alias of the four, for use in query.py/session.py signatures.
+
+Proof:
+```
+$ python3 -c "from agent.intent import Intent, Extraction, QueryResult, Clarification, Refusal, OutOfRange, Outcome; ..."
+OK
+```
+
