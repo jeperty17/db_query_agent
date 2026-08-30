@@ -98,3 +98,31 @@ $ python3 -m pytest tests/test_query.py -v
 11 passed in 1.19s
 ```
 
+## Phase 5: result shaping and the summary line
+
+Added to `agent/query.py`: `run_query(conn, intent) -> QueryResult` (COUNT(*)
+with the same WHERE, capped 50-row sample, notes for capping / zero-rows /
+partial dataset coverage) and `format_summary(result) -> str` (the plain-English
+line, e.g. `"1,247 frames | CTE | 24-30 Aug 2026 | 08:00-10:00 | Tuesdays only"`,
+omitting any axis that isn't filtered).
+
+`run_query` derives the COUNT query's WHERE clause by slicing the string
+`build_query` already produced (`sql[len(_SELECT):-len(" ORDER BY datetime")]`)
+rather than rebuilding it — one clause-building path, not two that could drift.
+The sliced-out substring is only ever `""` or `" WHERE camera IN (?,?) AND ..."`
+built entirely from bound-parameter placeholders and fixed column names, so it
+carries no user text.
+
+Days-of-week formatting special-cases `[5,6]` -> "Weekends" and `[0,1,2,3,4]` ->
+"Weekdays" (matrix D2/D3 read naturally that way); anything else joins plural
+day names.
+
+Proof:
+```
+$ python3 -m pytest tests/test_query.py -v
+16 passed in 1.17s
+```
+Covers: sample capping + total note, B14 partial-coverage note ("...30 Aug
+2026..." when requesting through 08-31 but data ends 08-30), zero-rows-says-so
+(C11-style), and format_summary with all axes set vs. none.
+

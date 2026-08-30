@@ -4,8 +4,8 @@ See SPEC.md section 11 and test-matrix.md section C / D7.
 """
 from datetime import date, time
 
-from agent.intent import Intent
-from agent.query import build_query
+from agent.intent import Intent, QueryResult
+from agent.query import build_query, format_summary, run_query
 
 
 def test_no_filters():
@@ -88,3 +88,42 @@ def test_D7_day_of_week_origin_matches_python_monday_zero(db_conn):
     monday = Intent(days_of_week=[1], date_from=date(2026, 8, 24), date_to=date(2026, 8, 24))
     sql, params = build_query(monday)
     assert db_conn.execute(sql, params).fetchall() == []
+
+
+# --- Phase 5: result shaping and the summary line ---
+
+def test_run_query_caps_sample_and_notes_total(db_conn):
+    result = run_query(db_conn, Intent(camera=["PIE"]))
+    assert result.total == 69696  # 288/day * 242 days (2026-01-01..2026-08-30)
+    assert len(result.rows) == 50
+    assert any("Showing the first 50" in n for n in result.notes)
+
+
+def test_run_query_B14_flags_partial_dataset_coverage(db_conn):
+    result = run_query(db_conn, Intent(date_from=date(2026, 8, 1), date_to=date(2026, 8, 31)))
+    assert any("30 Aug 2026" in n for n in result.notes)
+
+
+def test_run_query_zero_rows_says_so_plainly(db_conn):
+    intent = Intent(camera=["PIE"], date_from=date(2026, 8, 30), date_to=date(2026, 8, 30),
+                     time_from=time(10, 1), time_to=time(10, 3))
+    result = run_query(db_conn, intent)
+    assert result.total == 0
+    assert result.rows == []
+    assert result.notes == ["No frames match those filters."]
+
+
+def test_format_summary_all_axes():
+    result = QueryResult(
+        intent=Intent(camera=["CTE"], date_from=date(2026, 8, 24), date_to=date(2026, 8, 30),
+                       time_from=time(8, 0), time_to=time(10, 0), days_of_week=[1]),
+        total=1247, rows=[], notes=["Showing the first 50 of 1,247."],
+    )
+    line = format_summary(result)
+    assert line.startswith("1,247 frames | CTE | 24-30 Aug 2026 | 08:00-10:00 | Tuesdays only")
+    assert "Showing the first 50 of 1,247." in line
+
+
+def test_format_summary_omits_unset_axes():
+    result = QueryResult(intent=Intent(), total=696960, rows=[], notes=[])
+    assert format_summary(result) == "696,960 frames"

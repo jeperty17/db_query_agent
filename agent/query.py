@@ -1,7 +1,12 @@
-"""Query builder and read-only execution. See SPEC.md section 11."""
+"""Query builder, execution, and result shaping. See SPEC.md sections 11-12."""
 import sqlite3
+from datetime import date
 
-from agent.intent import Intent
+from agent.intent import Intent, QueryResult
+
+SAMPLE_CAP = 50
+_SELECT = "SELECT frame_id, datetime, camera FROM frames"
+_DOW_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 
 def build_query(intent: Intent) -> tuple[str, list]:
@@ -34,7 +39,7 @@ def build_query(intent: Intent) -> tuple[str, list]:
         clauses.append(f"day_of_week IN ({placeholders})")
         params.extend(intent.days_of_week)
 
-    sql = "SELECT frame_id, datetime, camera FROM frames"
+    sql = _SELECT
     if clauses:
         sql += " WHERE " + " AND ".join(clauses)
     return sql + " ORDER BY datetime", params
@@ -42,3 +47,73 @@ def build_query(intent: Intent) -> tuple[str, list]:
 
 def connect(db_path: str = "frames.db") -> sqlite3.Connection:
     return sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+
+
+def _dataset_bounds(conn: sqlite3.Connection) -> tuple[date, date]:
+    min_d, max_d = conn.execute("SELECT MIN(frame_date), MAX(frame_date) FROM frames").fetchone()
+    return date.fromisoformat(min_d), date.fromisoformat(max_d)
+
+
+def run_query(conn: sqlite3.Connection, intent: Intent) -> QueryResult:
+    sql, params = build_query(intent)
+    where = sql[len(_SELECT):-len(" ORDER BY datetime")]  # "" or " WHERE ..."
+    total = conn.execute(f"SELECT COUNT(*) FROM frames{where}", params).fetchone()[0]
+    rows = conn.execute(sql, params).fetchmany(SAMPLE_CAP)
+
+    notes = []
+    if total == 0:
+        notes.append("No frames match those filters.")
+    elif total > len(rows):
+        notes.append(f"Showing the first {len(rows)} of {total:,}.")
+
+    if intent.date_to:
+        _, max_d = _dataset_bounds(conn)
+        if intent.date_to > max_d:
+            notes.append(f"Data only goes up to {max_d:%d %b %Y}; the requested range extends beyond that.")
+
+    return QueryResult(intent=intent, total=total, rows=rows, notes=notes)
+
+
+def _format_date_range(date_from: date | None, date_to: date | None) -> str:
+    if not date_from and not date_to:
+        return ""
+    if date_from and not date_to:
+        return f"from {date_from.day} {date_from:%b %Y}"
+    if date_to and not date_from:
+        return f"up to {date_to.day} {date_to:%b %Y}"
+    if date_from == date_to:
+        return f"{date_from.day} {date_from:%b %Y}"
+    if (date_from.year, date_from.month) == (date_to.year, date_to.month):
+        return f"{date_from.day}-{date_to.day} {date_to:%b %Y}"
+    if date_from.year == date_to.year:
+        return f"{date_from.day} {date_from:%b}-{date_to.day} {date_to:%b %Y}"
+    return f"{date_from.day} {date_from:%b %Y} - {date_to.day} {date_to:%b %Y}"
+
+
+def _format_days(days_of_week: list[int]) -> str:
+    days = sorted(days_of_week)
+    if days == [5, 6]:
+        return "Weekends"
+    if days == [0, 1, 2, 3, 4]:
+        return "Weekdays"
+    if len(days) == 1:
+        return f"{_DOW_NAMES[days[0]]}s only"
+    return " and ".join(f"{_DOW_NAMES[d]}s" for d in days)
+
+
+def format_summary(result: QueryResult) -> str:
+    intent = result.intent
+    parts = [f"{result.total:,} frames"]
+    if intent.camera:
+        parts.append(", ".join(intent.camera))
+    date_part = _format_date_range(intent.date_from, intent.date_to)
+    if date_part:
+        parts.append(date_part)
+    if intent.time_from and intent.time_to:
+        parts.append(f"{intent.time_from:%H:%M}-{intent.time_to:%H:%M}")
+    if intent.days_of_week:
+        parts.append(_format_days(intent.days_of_week))
+    line = " | ".join(parts)
+    if result.notes:
+        line += "\n" + "\n".join(result.notes)
+    return line
