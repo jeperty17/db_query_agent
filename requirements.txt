@@ -1,0 +1,4 @@
+pydantic
+rapidfuzz
+google-genai
+pytest
