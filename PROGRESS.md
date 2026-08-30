@@ -68,3 +68,33 @@ $ python3 -m pytest tests/test_cameras.py -v
 18 passed in 0.03s
 ```
 
+## Phase 4: agent/query.py builder + tests/test_query.py
+
+`build_query(intent)` is section 11's code verbatim: one clause per present
+field, every value a bound parameter, the only f-strings are the `?`
+placeholder scaffolding derived from list length. `connect()` opens
+`file:frames.db?mode=ro` (read-only guardrail, non-negotiable #3).
+
+Kept result-shaping (notes, capping, the summary line) out of this file —
+that's phase 5's job per the build order, not phase 4's.
+
+`tests/conftest.py` added: `NOW_A`/`NOW_B` frozen clocks and a session-scoped
+`db_conn` fixture (calls `setup_db.generate` — idempotent, so it's a no-op if
+`frames.db` is already current).
+
+Test file hand-builds Intent objects and checks both the generated SQL text
+and real row counts against `frames.db`:
+- C1 boundary (08:00-10:00 inclusive on one day/camera = 25 rows, not 24)
+- C10 overnight OR-clause stays within one day (97 rows), doesn't shift date_to
+- C11 sub-5-minute window (10:01-10:03) legitimately returns 0 rows
+- D7 origin check: `days_of_week=[1]` (Tuesday, Python-Monday-0 convention)
+  returns the full 2880 rows on 2026-08-25 (a Tuesday) and 0 on 2026-08-24
+  (a Monday) — this is the exact SQLite-vs-Python weekday() bug the spec
+  warns about, caught by asserting on a Monday explicitly.
+
+Proof:
+```
+$ python3 -m pytest tests/test_query.py -v
+11 passed in 1.19s
+```
+
