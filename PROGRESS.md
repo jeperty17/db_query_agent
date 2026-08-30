@@ -41,3 +41,30 @@ $ python3 -c "from agent.intent import Intent, Extraction, QueryResult, Clarific
 OK
 ```
 
+## Phase 3: agent/cameras.py + tests/test_cameras.py (matrix section A)
+
+`resolve_camera(phrase)`: normalize (lowercase, punctuation -> space, collapse
+whitespace) -> exact acronym check -> strip trailing road word -> `rapidfuzz.fuzz.WRatio`
+against the ten stems (derived from `CAMERAS`, not hand-duplicated) -> accept only if
+top score clears a floor and beats the runner-up by a margin.
+
+Chose floor=70, margin=10 by scoring the matrix's real cases (typos included, e.g.
+"kranjee" -> KJE 76.9) against decoys (Jurong, "tpy", "the", Serangoon, Woodlands,
+Changi, Sengkang — all <=60 top score) with a small ad-hoc script — see the ranked
+score dump in this session's shell history. This *is* the section J calibration; a
+formal `agent/calibrate.py` gets built at phase 12 mainly to make the process
+reproducible and to document it in the README, not to re-derive different numbers.
+
+Test file covers matrix A1-A16, A20 (18 parametrized cases) as isolated camera-phrase
+spans, matching resolve_camera's actual signature — a full sentence like "show me CTE
+frames" is not what the function receives; the model extracts the span first (phase 6+).
+A17 (multi-camera) gets its own test. A18/A19 (empty camera_phrases -> `[]`) and A21
+(validator rejects a hallucinated camera) aren't resolve_camera behavior — they belong
+to extraction/validation, deferred to phases 7/9.
+
+Proof:
+```
+$ python3 -m pytest tests/test_cameras.py -v
+18 passed in 0.03s
+```
+
