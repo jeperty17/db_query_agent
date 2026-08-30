@@ -163,3 +163,37 @@ $ python3 -c "from agent.extract import extract; from datetime import datetime; 
 action='query' camera_phrases=['CTE'] date_from=date(2026,8,30) date_to=date(2026,8,30) time_from=None time_to=None days_of_week=None message=None
 ```
 
+## Phase 7: validation (camera resolution, date swap, enum check, data bounds)
+
+Added `resolve_intent(extraction, bounds) -> Intent | Clarification | Refusal
+| OutOfRange` to `agent/query.py` rather than creating a new file — SPEC.md
+section 3's file layout has no `validate.py`, and validation is a small,
+Intent-shaped extension of query.py's existing "turn extraction into
+something you can query" job. `agent/session.py` (phase 8) will own turn
+*state* (the prev-intent handoff); this is the pure, stateless piece.
+
+Handles all five section-10 steps: `action="refuse"`/`"clarify"` pass
+straight through to `Refusal`/`Clarification`; each camera phrase resolves
+through `resolve_camera`, and a `None` **or** a resolved value somehow not in
+`CAMERAS` (A21 — defense in depth resolve_camera's own contract already
+prevents, but the validator checks it explicitly) becomes a `Clarification`;
+a reversed date range is swapped in code (B17); bounds-checking treats
+`date_from > max_date` or `date_to < min_date` as entirely-outside ->
+`OutOfRange` (B22/B23), while a range that only partially overlaps the
+dataset (B14: requesting through 08-31 when data ends 08-30) stays a valid,
+unclamped `Intent` — that partial-coverage case is a `run_query` note
+(phase 5), not a validation failure.
+
+`resolve_intent` takes no `now` — the model already resolved every relative
+date/time before this runs; nothing here interprets a relative expression, so
+non-negotiable #4 doesn't apply to it.
+
+Proof:
+```
+$ python3 -m pytest tests/test_query.py tests/test_cameras.py -v
+42 passed in 1.17s
+```
+New cases: refuse/clarify passthrough, unresolvable camera -> clarification,
+A21 (monkeypatched resolve_camera to prove the defense-in-depth check),
+B17 swap, B22/B23 out-of-range, B14 partial-overlap stays a valid Intent.
+

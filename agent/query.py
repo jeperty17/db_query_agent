@@ -1,8 +1,9 @@
-"""Query builder, execution, and result shaping. See SPEC.md sections 11-12."""
+"""Query builder, execution, result shaping, and validation. See SPEC.md sections 10-12."""
 import sqlite3
 from datetime import date
 
-from agent.intent import Intent, QueryResult
+from agent.cameras import CAMERAS, resolve_camera
+from agent.intent import Clarification, Extraction, Intent, OutOfRange, QueryResult, Refusal
 
 SAMPLE_CAP = 50
 _SELECT = "SELECT frame_id, datetime, camera FROM frames"
@@ -49,7 +50,7 @@ def connect(db_path: str = "frames.db") -> sqlite3.Connection:
     return sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
 
 
-def _dataset_bounds(conn: sqlite3.Connection) -> tuple[date, date]:
+def dataset_bounds(conn: sqlite3.Connection) -> tuple[date, date]:
     min_d, max_d = conn.execute("SELECT MIN(frame_date), MAX(frame_date) FROM frames").fetchone()
     return date.fromisoformat(min_d), date.fromisoformat(max_d)
 
@@ -67,11 +68,50 @@ def run_query(conn: sqlite3.Connection, intent: Intent) -> QueryResult:
         notes.append(f"Showing the first {len(rows)} of {total:,}.")
 
     if intent.date_to:
-        _, max_d = _dataset_bounds(conn)
+        _, max_d = dataset_bounds(conn)
         if intent.date_to > max_d:
             notes.append(f"Data only goes up to {max_d:%d %b %Y}; the requested range extends beyond that.")
 
     return QueryResult(intent=intent, total=total, rows=rows, notes=notes)
+
+
+def resolve_intent(
+    extraction: Extraction, bounds: tuple[date, date]
+) -> Intent | Clarification | Refusal | OutOfRange:
+    """Validation: SPEC.md section 10. Turns a raw model Extraction into a
+    validated Intent, or into the Clarification/Refusal/OutOfRange that
+    validation itself produces. Dates and times are already resolved by the
+    model; nothing here interprets a relative expression.
+    """
+    if extraction.action == "refuse":
+        return Refusal(message=extraction.message or "This system only queries CCTV frame records.")
+    if extraction.action == "clarify":
+        return Clarification(question=extraction.message or "Could you clarify your request?")
+
+    cameras = []
+    for phrase in extraction.camera_phrases:
+        resolved = resolve_camera(phrase)
+        if resolved is None or resolved not in CAMERAS:  # A21: hallucinated value never reaches the query
+            return Clarification(question=f"Which camera did you mean by \"{phrase}\"?")
+        cameras.append(resolved)
+
+    date_from, date_to = extraction.date_from, extraction.date_to
+    if date_from and date_to and date_from > date_to:
+        date_from, date_to = date_to, date_from  # a backwards range is a user error with an obvious fix
+
+    intent = Intent(
+        camera=cameras, date_from=date_from, date_to=date_to,
+        time_from=extraction.time_from, time_to=extraction.time_to,
+        days_of_week=extraction.days_of_week,
+    )
+
+    min_d, max_d = bounds
+    entirely_before = date_to is not None and date_to < min_d
+    entirely_after = date_from is not None and date_from > max_d
+    if entirely_before or entirely_after:
+        return OutOfRange(intent=intent, requested=(date_from, date_to), available=(min_d, max_d))
+
+    return intent
 
 
 def _format_date_range(date_from: date | None, date_to: date | None) -> str:

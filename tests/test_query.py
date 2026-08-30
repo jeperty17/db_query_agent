@@ -4,8 +4,8 @@ See SPEC.md section 11 and test-matrix.md section C / D7.
 """
 from datetime import date, time
 
-from agent.intent import Intent, QueryResult
-from agent.query import build_query, format_summary, run_query
+from agent.intent import Clarification, Extraction, Intent, OutOfRange, QueryResult, Refusal
+from agent.query import build_query, format_summary, resolve_intent, run_query
 
 
 def test_no_filters():
@@ -127,3 +127,60 @@ def test_format_summary_all_axes():
 def test_format_summary_omits_unset_axes():
     result = QueryResult(intent=Intent(), total=696960, rows=[], notes=[])
     assert format_summary(result) == "696,960 frames"
+
+
+# --- Phase 7: validation (test-matrix.md B17, B22, B23, B14, A21) ---
+
+BOUNDS = (date(2026, 1, 1), date(2026, 8, 30))
+
+
+def test_refuse_passes_through():
+    result = resolve_intent(Extraction(action="refuse", message="no cars here"), BOUNDS)
+    assert result == Refusal(message="no cars here")
+
+
+def test_clarify_passes_through():
+    result = resolve_intent(Extraction(action="clarify", message="which camera?"), BOUNDS)
+    assert result == Clarification(question="which camera?")
+
+
+def test_unresolvable_camera_phrase_becomes_clarification():
+    extraction = Extraction(action="query", camera_phrases=["Jurong Expressway"])
+    assert isinstance(resolve_intent(extraction, BOUNDS), Clarification)
+
+
+def test_A21_validator_catches_a_camera_resolve_camera_would_never_emit(monkeypatch):
+    # resolve_camera's own contract never returns anything but one of the ten
+    # keys or None; this proves the validator's defense-in-depth check works
+    # even if that contract were ever violated.
+    monkeypatch.setattr("agent.query.resolve_camera", lambda phrase: "XYZ")
+    extraction = Extraction(action="query", camera_phrases=["CTE"])
+    assert isinstance(resolve_intent(extraction, BOUNDS), Clarification)
+
+
+def test_B17_reversed_date_range_swapped_in_code():
+    extraction = Extraction(action="query", date_from=date(2026, 8, 18), date_to=date(2026, 8, 15))
+    result = resolve_intent(extraction, BOUNDS)
+    assert result.date_from == date(2026, 8, 15)
+    assert result.date_to == date(2026, 8, 18)
+
+
+def test_B22_entirely_future_range_is_out_of_range():
+    extraction = Extraction(action="query", date_from=date(2027, 1, 1), date_to=date(2027, 1, 1))
+    result = resolve_intent(extraction, BOUNDS)
+    assert isinstance(result, OutOfRange)
+    assert result.available == BOUNDS
+
+
+def test_B23_entirely_past_range_is_out_of_range():
+    extraction = Extraction(action="query", date_from=date(2025, 12, 1), date_to=date(2025, 12, 31))
+    assert isinstance(resolve_intent(extraction, BOUNDS), OutOfRange)
+
+
+def test_B14_partial_overlap_is_not_out_of_range():
+    # "the whole of August": date_to runs past the dataset's 30 Aug end, but
+    # the range still overlaps real data, so this is a valid Intent, not OutOfRange.
+    extraction = Extraction(action="query", date_from=date(2026, 8, 1), date_to=date(2026, 8, 31))
+    result = resolve_intent(extraction, BOUNDS)
+    assert isinstance(result, Intent)
+    assert result.date_to == date(2026, 8, 31)  # not clamped
