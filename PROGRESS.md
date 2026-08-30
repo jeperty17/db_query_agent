@@ -254,3 +254,21 @@ date batches, further live calls intermittently stalled or failed with Gemini
 passed after the earlier transient failures. Sections C-E remain marked `llm`
 and ready to rerun with `python3 -m pytest tests/test_extraction.py -m llm` in
 an environment with stable Gemini access.
+
+## Phase 10: follow-up and guardrail matrix tests (sections F-G)
+
+Added 10 multi-turn follow-up cases and all 14 guardrail cases. Follow-up tests
+assert the full intent after each turn and verify that a refusal or clarification
+does not replace state. Guardrail tests exercise refusal, SQL-like injection,
+and the appended-injection query; all model-facing tests are marked `llm`.
+
+Proof:
+```
+$ python3 -m pytest tests/test_followups.py tests/test_guardrails.py --collect-only -q
+24 tests collected
+$ python3 -m pytest -m 'not llm' -q
+42 passed, 71 deselected
+```
+
+Live F/G execution is pending the same intermittent Gemini DNS/connectivity
+failure recorded in phase 9; no matrix expectation was changed.
