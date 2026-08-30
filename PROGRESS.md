@@ -285,3 +285,18 @@ Proof:
 $ python3 -m pytest tests/test_responses.py -m 'not llm' -q
 3 passed, 6 deselected
 ```
+
+## Phase 12: reproducible fuzzy-threshold calibration (section J)
+
+Added `agent/calibrate.py`, which scores typo variants and plausible
+non-camera names against the actual camera stems. It supports the hard-coded
+floor `70` and margin `10`: the weakest listed true typo is 76.9, while the
+highest listed decoy is 50.0.
+
+Proof:
+```
+$ python3 -m agent.calibrate
+Chosen floor=70, margin=10 (see README).
+$ python3 -m pytest tests/test_cameras.py -q
+18 passed
+```
