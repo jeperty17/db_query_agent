@@ -197,3 +197,34 @@ New cases: refuse/clarify passthrough, unresolvable camera -> clarification,
 A21 (monkeypatched resolve_camera to prove the defense-in-depth check),
 B17 swap, B22/B23 out-of-range, B14 partial-overlap stays a valid Intent.
 
+## Phase 8: agent/session.py + cli.py
+
+`session.py`: `handle_turn(message, prev, now) -> Outcome` — the exact
+signature from SPEC.md section 8 — calls `extract`, then `resolve_intent`,
+then `run_query` if validation produced an `Intent`, else returns the
+Clarification/Refusal/OutOfRange as-is. Holds the read-only db connection as
+a lazily-initialized module-level singleton (`_connection()`), the same
+pattern `extract.py` already uses for the Gemini client — one connection per
+process, not per call, not a class. `next_state(prev, outcome)` implements
+section 12's state table: `QueryResult`/`OutOfRange` replace state,
+`Clarification`/`Refusal` leave it unchanged.
+
+`cli.py`: the one place allowed to call `datetime.now()` (non-negotiable
+#4). Reads a line, calls `handle_turn`, updates `prev` via `next_state`,
+prints the resolved intent alongside the outcome (section 14) plus up to 10
+sample rows.
+
+Proof — piped 3-turn conversation matching matrix F1 (add camera then date
+constraint) then F2 (swap camera, keep dates):
+```
+$ printf 'show me frames from CTE\nhow about only this week\nwhat about MCE\n' | python3 cli.py
+intent: camera=['CTE'] ...                                    # turn 1
+69,696 frames | CTE
+intent: camera=['CTE'] date_from=2026-08-24 date_to=2026-08-30  # turn 2 (F1)
+2,016 frames | CTE | 24-30 Aug 2026
+intent: camera=['MCE'] date_from=2026-08-24 date_to=2026-08-30  # turn 3 (F2)
+2,016 frames | MCE | 24-30 Aug 2026
+```
+Camera carried forward on turn 2, swapped while dates persisted on turn 3 —
+exactly the matrix's expected behaviour, end to end through real API calls.
+
