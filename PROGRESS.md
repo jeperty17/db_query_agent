@@ -315,3 +315,16 @@ $ python3 -m py_compile benchmark.py agent/extract.py
 
 Live comparison is deferred until Gemini connectivity is stable (the same
 environmental failure noted in phases 9-10).
+
+## Phase 14: README
+
+Added setup, database-generation, run/test, architecture, safety, complete
+date/time convention, model-choice, and threshold-calibration documentation.
+The README intentionally records no invented benchmark figures while live
+connectivity is unstable.
+
+Proof:
+```
+$ python3 -m pytest -m 'not llm' -q
+45 passed, 71 deselected
+```
