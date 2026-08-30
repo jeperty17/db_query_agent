@@ -15,7 +15,7 @@ def _connection():
     return _conn
 
 
-def handle_turn(message: str, prev: Intent | None, now: datetime) -> Outcome:
+def handle_turn(message, prev, now):
     extraction = extract(message, prev, now)
     conn = _connection()
     result = resolve_intent(extraction, dataset_bounds(conn))
@@ -24,7 +24,7 @@ def handle_turn(message: str, prev: Intent | None, now: datetime) -> Outcome:
     return result
 
 
-def next_state(prev: Intent | None, outcome: Outcome) -> Intent | None:
+def next_state(prev, outcome):
     """SPEC.md section 12: QueryResult and OutOfRange replace state with the
     new intent; Clarification and Refusal leave it unchanged."""
     if isinstance(outcome, (QueryResult, OutOfRange)):

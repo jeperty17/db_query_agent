@@ -6,7 +6,7 @@ from agent.query import format_summary
 from agent.session import handle_turn, next_state
 
 
-def _print_outcome(outcome) -> None:
+def _print_outcome(outcome):
     if isinstance(outcome, QueryResult):
         print(format_summary(outcome))
         for frame_id, dt, camera in outcome.rows[:10]:
@@ -21,8 +21,8 @@ def _print_outcome(outcome) -> None:
         print(f"Out of range: requested {req_from}..{req_to}, data covers {avail_from}..{avail_to}")
 
 
-def main() -> None:
-    prev: Intent | None = None
+def main():
+    prev = None
     print("Ask about CCTV frames. Ctrl-D to quit.")
     while True:
         try:

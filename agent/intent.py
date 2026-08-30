@@ -2,56 +2,65 @@
 
 See SPEC.md sections 5, 7, and 12.
 """
-from dataclasses import dataclass, field
 from datetime import date, time
-from typing import Literal, Union
 
-from pydantic import BaseModel
+from pydantic import create_model
 
-
-class Intent(BaseModel):
-    camera: list[str] = []          # resolved acronyms; [] means all cameras
-    date_from: date | None = None
-    date_to: date | None = None
-    time_from: time | None = None
-    time_to: time | None = None
-    days_of_week: list[int] | None = None  # 0=Mon .. 6=Sun
+NONE_TYPE = type(None)
 
 
-class Extraction(BaseModel):
-    action: Literal["query", "clarify", "refuse"]
-    camera_phrases: list[str] = []  # verbatim spans from the message
-    date_from: date | None = None
-    date_to: date | None = None
-    time_from: time | None = None
-    time_to: time | None = None
-    days_of_week: list[int] | None = None
-    message: str | None = None      # text for clarify and refuse
+Intent = create_model(
+    "Intent",
+    camera=(list, []),              # resolved acronyms; [] means all cameras
+    date_from=(date | NONE_TYPE, None),
+    date_to=(date | NONE_TYPE, None),
+    time_from=(time | NONE_TYPE, None),
+    time_to=(time | NONE_TYPE, None),
+    days_of_week=(list | NONE_TYPE, None),  # 0=Mon .. 6=Sun
+)
 
 
-@dataclass
-class QueryResult:
-    intent: Intent
-    total: int
-    rows: list[tuple[int, str, str]]  # frame_id, datetime, camera (capped sample)
-    notes: list[str] = field(default_factory=list)
+Extraction = create_model(
+    "Extraction",
+    action=(str, ...),
+    camera_phrases=(list, []),      # verbatim spans from the message
+    date_from=(date | NONE_TYPE, None),
+    date_to=(date | NONE_TYPE, None),
+    time_from=(time | NONE_TYPE, None),
+    time_to=(time | NONE_TYPE, None),
+    days_of_week=(list | NONE_TYPE, None),
+    message=(str | NONE_TYPE, None),  # text for clarify and refuse
+)
 
 
-@dataclass
-class Clarification:
-    question: str
+class _Outcome:
+    def __eq__(self, other):
+        return type(self) is type(other) and self.__dict__ == other.__dict__
 
 
-@dataclass
-class Refusal:
-    message: str
+class QueryResult(_Outcome):
+    def __init__(self, intent, total, rows, notes=None):
+        self.intent = intent
+        self.total = total
+        self.rows = rows             # frame_id, datetime, camera (capped sample)
+        self.notes = [] if notes is None else notes
 
 
-@dataclass
-class OutOfRange:
-    intent: Intent
-    requested: tuple[date | None, date | None]
-    available: tuple[date, date]
+class Clarification(_Outcome):
+    def __init__(self, question):
+        self.question = question
 
 
-Outcome = Union[QueryResult, Clarification, Refusal, OutOfRange]
+class Refusal(_Outcome):
+    def __init__(self, message):
+        self.message = message
+
+
+class OutOfRange(_Outcome):
+    def __init__(self, intent, requested, available):
+        self.intent = intent
+        self.requested = requested
+        self.available = available
+
+
+Outcome = (QueryResult, Clarification, Refusal, OutOfRange)

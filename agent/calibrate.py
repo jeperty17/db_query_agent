@@ -1,25 +1,28 @@
 """Reproducible fuzzy-camera threshold calibration (test-matrix.md section J)."""
 from rapidfuzz import fuzz
 
-from agent.cameras import _STEMS
-
-TYPO_VARIANTS = [
-    "pan isalnd", "ayer raja", "east coas", "centarl", "tampines expersway",
-    "kallang paya lebar", "seletar expwy", "bukit timha", "kranjee", "marina coatal",
-]
-NON_CAMERAS = ["Jurong", "Serangoon", "Woodlands", "Changi"]
+from agent.camera_cases import CAMERA_CASES
+from agent.cameras import CAMERAS, _STEMS, _normalize, _strip_road_word
 
 
-def best_two(phrase: str) -> tuple[float, float]:
-    scores = sorted((fuzz.WRatio(phrase, stem) for stem in _STEMS.values()), reverse=True)
+def best_two(phrase):
+    stem = _strip_road_word(_normalize(phrase))
+    scores = sorted((fuzz.WRatio(stem, camera_stem) for camera_stem in _STEMS.values()), reverse=True)
     return scores[0], scores[1]
 
 
-def main() -> None:
-    print("phrase\tbest\trunner-up")
-    for phrase in TYPO_VARIANTS + NON_CAMERAS:
+def main():
+    # Exact acronyms do not reach fuzzy matching, so omit them from this report.
+    fuzzy_cases = [
+        (case_id, phrase, expected)
+        for case_id, phrase, expected in CAMERA_CASES
+        if _normalize(phrase).replace(" ", "").upper() not in CAMERAS
+    ]
+    print("case\texpected\tbest\trunner-up")
+    for case_id, phrase, expected in fuzzy_cases:
         best, runner_up = best_two(phrase)
-        print(f"{phrase}\t{best:.1f}\t{runner_up:.1f}")
+        expectation = expected or "reject"
+        print(f"{case_id}\t{expectation}\t{best:.1f}\t{runner_up:.1f}")
     print("Chosen floor=70, margin=10 (see README).")
 
 

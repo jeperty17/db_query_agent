@@ -288,10 +288,10 @@ $ python3 -m pytest tests/test_responses.py -m 'not llm' -q
 
 ## Phase 12: reproducible fuzzy-threshold calibration (section J)
 
-Added `agent/calibrate.py`, which scores typo variants and plausible
-non-camera names against the actual camera stems. It supports the hard-coded
-floor `70` and margin `10`: the weakest listed true typo is 76.9, while the
-highest listed decoy is 50.0.
+Added `agent/calibrate.py`, which scores the accepted and rejected camera cases
+from the test matrix against the actual camera stems. It supports the hard-coded
+floor `70` and margin `10` without maintaining a second, arbitrary list of
+typos and non-camera names.
 
 Proof:
 ```
@@ -315,6 +315,13 @@ $ python3 -m py_compile benchmark.py agent/extract.py
 
 Live comparison is deferred until Gemini connectivity is stable (the same
 environmental failure noted in phases 9-10).
+
+## Post-phase update: morning convention and Gemini 3.5 Flash-Lite
+
+Confirmed and retained the global morning interval as `06:00-11:59`, including
+follow-up F5. Switched the default model to `gemini-3.5-flash-lite` and made the
+shared extraction limiter a strict five-second minimum interval (at most 12
+requests/minute) for both CLI and the serial pytest suite.
 
 ## Phase 14: README
 

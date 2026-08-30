@@ -24,7 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_frames_dow    ON frames(day_of_week);
 """
 
 
-def _rows_for_day(day: date) -> list[tuple]:
+def _rows_for_day(day):
     rows = []
     midnight = datetime(day.year, day.month, day.day)
     dow = day.weekday()  # 0=Monday, matches Intent.days_of_week convention
@@ -35,7 +35,7 @@ def _rows_for_day(day: date) -> list[tuple]:
     return rows
 
 
-def generate(today: date, db_path: str = DB_PATH) -> None:
+def generate(today, db_path=DB_PATH):
     conn = sqlite3.connect(db_path)
     conn.executescript(SCHEMA)
 

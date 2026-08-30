@@ -54,14 +54,15 @@ and the database is read-only. Unsupported, sensitive, unrelated, and mutation
 requests are refused while clarifications preserve conversational state.
 
 Camera names are lowercased, stripped of punctuation and trailing road words,
-then matched against ten stems. Acronyms must be exact. Calibration scores show
-the weakest listed intended typo at 76.9 and the strongest listed decoy at 50.0,
-so the hard-coded score floor is 70 with a 10-point winner/runner-up margin.
+then matched against ten stems. Acronyms must be exact. Calibration derives its
+scores from the accepted and rejected camera cases in the test matrix, rather
+than from a separate, arbitrary list of typos and non-camera names. The
+hard-coded score floor is 70 with a 10-point winner/runner-up margin.
 
 ## Model choice
 
-The default is `gemini-3.1-flash-lite`: this is constrained structured
+The default is `gemini-3.5-flash-lite`: this is constrained structured
 extraction, not a task that benefits from a multi-step agent. The client uses
-the SDK's Pydantic response-schema support, a 4.1-second minimum call interval,
+the SDK's Pydantic response-schema support, a five-second minimum call interval,
 retries, and a request timeout. Run `benchmark.py` to compare it with 3.5 Flash
 Lite using the same test matrix; no invented benchmark figures are reported.

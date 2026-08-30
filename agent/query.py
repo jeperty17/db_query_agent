@@ -10,7 +10,7 @@ _SELECT = "SELECT frame_id, datetime, camera FROM frames"
 _DOW_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
 
-def build_query(intent: Intent) -> tuple[str, list]:
+def build_query(intent):
     clauses, params = [], []
 
     if intent.camera:
@@ -46,16 +46,16 @@ def build_query(intent: Intent) -> tuple[str, list]:
     return sql + " ORDER BY datetime", params
 
 
-def connect(db_path: str = "frames.db") -> sqlite3.Connection:
+def connect(db_path="frames.db"):
     return sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
 
 
-def dataset_bounds(conn: sqlite3.Connection) -> tuple[date, date]:
+def dataset_bounds(conn):
     min_d, max_d = conn.execute("SELECT MIN(frame_date), MAX(frame_date) FROM frames").fetchone()
     return date.fromisoformat(min_d), date.fromisoformat(max_d)
 
 
-def run_query(conn: sqlite3.Connection, intent: Intent) -> QueryResult:
+def run_query(conn, intent):
     sql, params = build_query(intent)
     where = sql[len(_SELECT):-len(" ORDER BY datetime")]  # "" or " WHERE ..."
     total = conn.execute("SELECT COUNT(*) FROM frames" + where, params).fetchone()[0]
@@ -75,9 +75,7 @@ def run_query(conn: sqlite3.Connection, intent: Intent) -> QueryResult:
     return QueryResult(intent=intent, total=total, rows=rows, notes=notes)
 
 
-def resolve_intent(
-    extraction: Extraction, bounds: tuple[date, date]
-) -> Intent | Clarification | Refusal | OutOfRange:
+def resolve_intent(extraction, bounds):
     """Validation: SPEC.md section 10. Turns a raw model Extraction into a
     validated Intent, or into the Clarification/Refusal/OutOfRange that
     validation itself produces. Dates and times are already resolved by the
@@ -114,7 +112,7 @@ def resolve_intent(
     return intent
 
 
-def _format_date_range(date_from: date | None, date_to: date | None) -> str:
+def _format_date_range(date_from, date_to):
     if not date_from and not date_to:
         return ""
     if date_from and not date_to:
@@ -130,7 +128,7 @@ def _format_date_range(date_from: date | None, date_to: date | None) -> str:
     return f"{date_from.day} {date_from:%b %Y} - {date_to.day} {date_to:%b %Y}"
 
 
-def _format_days(days_of_week: list[int]) -> str:
+def _format_days(days_of_week):
     days = sorted(days_of_week)
     if days == [5, 6]:
         return "Weekends"
@@ -141,7 +139,7 @@ def _format_days(days_of_week: list[int]) -> str:
     return " and ".join(f"{_DOW_NAMES[d]}s" for d in days)
 
 
-def format_summary(result: QueryResult) -> str:
+def format_summary(result):
     intent = result.intent
     parts = [f"{result.total:,} frames"]
     if intent.camera:

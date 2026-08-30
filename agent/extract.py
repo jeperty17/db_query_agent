@@ -10,8 +10,8 @@ from google.genai import types
 
 from agent.intent import Extraction, Intent
 
-MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
-MIN_INTERVAL = 4.1     # seconds; free tier allows 15 requests/minute
+MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
+MIN_INTERVAL = 5.0     # one request every five seconds (12 RPM maximum)
 MAX_RETRIES = 3
 
 SYSTEM_PROMPT = """You turn a natural-language request into a structured filter over a table of \
@@ -57,7 +57,7 @@ _client = None
 _last_call = 0.0
 
 
-def _load_dotenv() -> None:
+def _load_dotenv():
     if "GEMINI_API_KEY" in os.environ:
         return
     try:
@@ -69,7 +69,7 @@ def _load_dotenv() -> None:
         pass
 
 
-def _client_instance() -> genai.Client:
+def _client_instance():
     global _client
     if _client is None:
         _load_dotenv()
@@ -77,7 +77,7 @@ def _client_instance() -> genai.Client:
     return _client
 
 
-def _throttle() -> None:
+def _throttle():
     global _last_call
     wait = MIN_INTERVAL - (_time.monotonic() - _last_call)
     if wait > 0:
@@ -85,7 +85,7 @@ def _throttle() -> None:
     _last_call = _time.monotonic()
 
 
-def extract(message: str, prev: Intent | None, now: datetime) -> Extraction:
+def extract(message, prev, now):
     contents = (
         f"Current datetime: {now.isoformat()}\n"
         f"Previous intent: {prev.model_dump_json() if prev else 'none'}\n"
@@ -113,7 +113,7 @@ def extract(message: str, prev: Intent | None, now: datetime) -> Extraction:
     raise last_error
 
 
-def _strip_tz(extraction: Extraction) -> Extraction:
+def _strip_tz(extraction):
     # The prompt asks for plain local time; strip any UTC offset the model
     # adds anyway so downstream code never compares aware to naive times.
     if extraction.time_from and extraction.time_from.tzinfo:

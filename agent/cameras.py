@@ -29,13 +29,13 @@ SCORE_FLOOR = 70
 SCORE_MARGIN = 10
 
 
-def _normalize(phrase: str) -> str:
+def _normalize(phrase):
     phrase = phrase.lower()
     phrase = re.sub(r"[^a-z0-9\s]", " ", phrase)
     return re.sub(r"\s+", " ", phrase).strip()
 
 
-def _strip_road_word(stem: str) -> str:
+def _strip_road_word(stem):
     words = stem.split()
     if words and words[-1] in ROAD_WORDS:
         words = words[:-1]
@@ -45,7 +45,7 @@ def _strip_road_word(stem: str) -> str:
 _STEMS = {acronym: _strip_road_word(_normalize(name)) for acronym, name in CAMERAS.items()}
 
 
-def resolve_camera(phrase: str) -> str | None:
+def resolve_camera(phrase):
     normalized = _normalize(phrase)
 
     acronym = normalized.replace(" ", "").upper()

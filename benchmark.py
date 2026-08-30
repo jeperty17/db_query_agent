@@ -5,7 +5,7 @@ import sys
 import time
 
 
-def main() -> None:
+def main():
     models = sys.argv[1:] or ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite"]
     print("model\tpassed\tfailed\twall_s")
     for model in models:
