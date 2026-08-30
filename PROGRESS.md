@@ -126,3 +126,40 @@ Covers: sample capping + total note, B14 partial-coverage note ("...30 Aug
 2026..." when requesting through 08-31 but data ends 08-30), zero-rows-says-so
 (C11-style), and format_summary with all axes set vs. none.
 
+## Phase 6: agent/extract.py (model call, prompt, throttling, retry)
+
+Verified the `google-genai` SDK's structured-output path first with a scratch
+call: `GenerateContentConfig(response_mime_type="application/json",
+response_schema=Extraction)` + `response.parsed` returns an already-parsed
+`Extraction` instance directly — no manual JSON parsing needed.
+
+`extract(message, prev, now) -> Extraction`: builds the system prompt once at
+module load (cameras, date/time convention tables, carry-forward and
+refuse/clarify instructions — kept to one paragraph per topic, no
+chain-of-thought scaffolding), sends current datetime + serialized previous
+intent + the message as the user turn, and returns `response.parsed`.
+
+Throttling/retry (SPEC.md section 15's "~5 lines"): a module-level
+`_last_call` timestamp enforces `MIN_INTERVAL = 4.1s` between calls (free tier
+= 15 req/min), plus up to 3 attempts with exponential backoff on any
+exception (covers 429s).
+
+`.env` isn't parsed by a dependency (only 4 allowed: pydantic, rapidfuzz,
+google-genai, pytest) — a five-line manual loader reads `GEMINI_API_KEY=`
+from `.env` into `os.environ` if not already set.
+
+`now` is a required parameter, never read from the clock internally — matches
+non-negotiable #4.
+
+Verified a hallucinated substitution risk: with a minimal test prompt, the
+model returned `camera_phrases=["Central Expressway"]` for input "CTE" (an
+expansion, not a verbatim copy). Not a correctness bug — `resolve_camera`
+already handles full names via fuzzy match — but the real system prompt
+explicitly says "copy the camera span verbatim" to stay closer to spec intent.
+
+Proof:
+```
+$ python3 -c "from agent.extract import extract; from datetime import datetime; print(extract('show me frames from CTE today', None, datetime(2026,8,30,14,30)))"
+action='query' camera_phrases=['CTE'] date_from=date(2026,8,30) date_to=date(2026,8,30) time_from=None time_to=None days_of_week=None message=None
+```
+
