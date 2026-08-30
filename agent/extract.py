@@ -10,7 +10,7 @@ from google.genai import types
 
 from agent.intent import Extraction, Intent
 
-MODEL = "gemini-3.1-flash-lite"
+MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
 MIN_INTERVAL = 4.1     # seconds; free tier allows 15 requests/minute
 MAX_RETRIES = 3
 

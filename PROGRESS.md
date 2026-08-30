@@ -300,3 +300,18 @@ Chosen floor=70, margin=10 (see README).
 $ python3 -m pytest tests/test_cameras.py -q
 18 passed
 ```
+
+## Phase 13: benchmark runner
+
+Added `benchmark.py`, a small runner for the complete `llm` suite. It runs each
+named Gemini model in a fresh subprocess via `GEMINI_MODEL`, printing its pytest
+pass/fail summary and wall time. It deliberately reuses the matrix tests rather
+than adding a benchmark-only evaluation layer.
+
+Proof:
+```
+$ python3 -m py_compile benchmark.py agent/extract.py
+```
+
+Live comparison is deferred until Gemini connectivity is stable (the same
+environmental failure noted in phases 9-10).
