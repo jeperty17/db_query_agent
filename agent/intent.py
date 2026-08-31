@@ -1,7 +1,5 @@
-"""The intent object, the model's raw extraction, and the four turn outcomes.
-
-See SPEC.md sections 5, 7, and 12.
-"""
+"""The shared data shapes: the model's raw output, the validated request,
+and the possible results the agent can return."""
 from dataclasses import dataclass, field
 from datetime import date, time
 

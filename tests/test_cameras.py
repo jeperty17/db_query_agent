@@ -1,8 +1,4 @@
-"""Test matrix section A: camera resolution. No API calls.
-
-resolve_camera takes an isolated camera-phrase span (what Extraction.camera_phrases
-would hold), not a full sentence, per SPEC.md section 6.
-"""
+"""Tests that camera names, nicknames, and typos all resolve to the right camera."""
 import pytest
 
 from agent.camera_cases import CAMERA_CASES

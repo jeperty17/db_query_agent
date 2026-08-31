@@ -1,7 +1,4 @@
-"""Query builder correctness. Hand-built Intent objects, real database. No API calls.
-
-See SPEC.md section 11 and test-matrix.md section C / D7.
-"""
+"""Tests that requests turn into correct, safe database queries."""
 from datetime import date, time
 
 from agent.intent import Clarification, Extraction, Intent, OutOfRange, QueryResult, Refusal
@@ -130,7 +127,7 @@ def test_format_summary_omits_unset_axes():
     assert format_summary(result) == "696,960 frames"
 
 
-# --- Phase 7: validation (test-matrix.md B17, B22, B23, B14, A21) ---
+# --- Validation: refusal, clarification, and bounds checks ---
 
 
 def test_refuse_passes_through():

@@ -1,4 +1,4 @@
-"""Live Gemini checks for test-matrix.md section F."""
+"""Checks that follow-up messages correctly build on the previous request."""
 from datetime import date, time
 
 import pytest

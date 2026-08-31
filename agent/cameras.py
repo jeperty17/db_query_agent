@@ -1,10 +1,7 @@
-"""Camera phrase -> acronym resolution. Pure function, no API call.
-
-See SPEC.md section 6.
-"""
+"""Matches whatever camera name the user typed to one of the real cameras."""
 import re
 
-from rapidfuzz import fuzz
+from rapidfuzz import fuzz, process
 
 CAMERAS = {
     "PIE": "Pan Island Expressway",
@@ -21,10 +18,9 @@ CAMERAS = {
 
 ROAD_WORDS = {"expressway", "highway", "parkway", "expwy", "expy", "road"}
 
-# Calibrated in agent/calibrate.py (SPEC.md section J / phase 12): real-camera
-# stems score >=76 against their own stem, decoys (Jurong, Serangoon,
-# Woodlands, Changi, garbled acronyms) top out at <=60. 70/10 sits in the gap
-# with margin either side. Recorded in README.md.
+# Calibrated in agent/calibrate.py: real-camera stems score >=76 against
+# their own stem, decoys (Jurong, Serangoon, Woodlands, Changi, garbled
+# acronyms) top out at <=60. 70/10 sits in the gap with margin either side.
 SCORE_FLOOR = 70
 SCORE_MARGIN = 10
 
@@ -37,7 +33,7 @@ def _normalize(phrase):
 
 def _strip_road_word(stem):
     words = stem.split()
-    if words and words[-1] in ROAD_WORDS:
+    if words and process.extractOne(words[-1], ROAD_WORDS, score_cutoff=80):
         words = words[:-1]
     return " ".join(words)
 

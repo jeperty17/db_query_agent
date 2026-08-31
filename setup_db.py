@@ -1,7 +1,4 @@
-"""Generates frames.db: one row per camera every 5 minutes, 2026-01-01 through today.
-
-Idempotent: rerunning appends only the days missing since the last run.
-"""
+"""Creates the sample CCTV frame database that the agent queries."""
 import sqlite3
 from datetime import date, datetime, timedelta
 

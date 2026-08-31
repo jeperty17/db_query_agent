@@ -1,4 +1,4 @@
-"""Camera phrase acceptance cases shared by tests and calibration tooling."""
+"""Example camera names, typos, and nicknames, with the camera each should match."""
 
 # (matrix id, isolated camera phrase, expected acronym; None means reject)
 CAMERA_CASES = (
@@ -19,4 +19,7 @@ CAMERA_CASES = (
     ("A15", "KJE", "KJE"),
     ("A16", "Jurong Expressway", None),
     ("A20", "the expressway", None),
+    ("A21", "marina", "MCE"),
+    ("A22", "kallang", "KPE"),
+    ("A23", "paya lebar", "KPE"),
 )

@@ -1,12 +1,24 @@
-# CCTV frame query agent
+# CCTV Frame Query Agent
 
-This is a deliberately small natural-language interface over generated CCTV
-frame records. One Gemini call returns an `Extraction` object. Deterministic
-Python resolves its camera phrases, validates it, builds a parameter-bound
-SQLite query, and shapes the response. The model never emits SQL or accesses the
-database.
+An agent capable of interpreting a natural language request, and turns it into a safe database query and returns the matching CCTV frame records. This is my submission\
+for Cynapse's "Natural Language to Database Query Agent" take-home assignment.
 
-## Setup and run
+## How it works, in plain terms
+
+1. You type something like `"Show me PIE frames from yesterday morning."`
+2. Gemini reads it and produces a structured filter (camera, dates, times,\
+   days of week). It never writes SQL and never touches the database.
+3. Plain Python checks the filter makes sense: is the camera real, are the\
+   dates in order, does the data even cover that range etc.?
+4. If it checks out, Python builds a safe, parameterized SQL query and runs\
+   it against a **read-only** database connection.
+5. You get a one-line summary plus a sample of matching frames.
+6. If your message is unclear, off-topic, or asks to change data, the agent\
+   asks a clarifying question or refuses. It never guesses or executes anything unsafe.
+
+Only one LLM call fires per turn/request, everything after that call is deterministic, testable Python with no API involved.
+
+## Setup
 
 ```sh
 python3 -m pip install -r requirements.txt
@@ -15,70 +27,211 @@ python3 setup_db.py
 python3 cli.py
 ```
 
-Dataset generation creates one frame per camera every five minutes from
-2026-01-01 through today. It takes a few seconds on a typical laptop and is
-idempotent: later runs append only missing dates. The generated `frames.db` is
-ignored by Git. The SQLite connection uses `mode=ro`, so writes fail at the
-driver.
+`setup_db.py` generates `frames.db`: one frame per camera every 5 minutes,\
+from 2026-01-01 through today. Takes a few seconds. Safe to rerun since it only adds days that are missing.
 
-Run deterministic tests with `python3 -m pytest -m 'not llm'`; run model tests
-with `python3 -m pytest -m llm`. To compare models, prefix the same command:
-`GEMINI_MODEL=gemini-3.5-flash-lite python3 -m pytest -m llm`.
+## Running tests
 
-## Conventions
+```sh
+python3 -m pytest -m 'not llm'   # fast, no API calls
+python3 -m pytest -m llm         # slower, hits the real Gemini API
+```
 
-All ranges are inclusive. `last`/`this` plus a calendar unit means that calendar
-unit; a numbered period is rolling from today; weeks run Monday–Sunday; numeric
-dates use DD/MM; the first week is days 1–7 and the last week is the final seven
-days; `last Tuesday` means the most recent Tuesday before today.
+## What you can ask it
 
-| Time phrase | Range |
-| --- | --- |
-| early morning | 00:00–05:59 |
-| morning | 06:00–11:59 |
-| lunch | 12:00–13:59 |
-| afternoon | 12:00–16:59 |
-| evening | 17:00–19:59 |
-| night | 20:00–23:59 |
+**Cameras** — full name, acronym, a common alternate name, or a typo all work:
 
-A bare hour is its whole clock hour (for example, `3pm` is 15:00–15:59).
-Overnight ranges are evaluated inside each date, rather than extending the date
-range.
+```plaintext
+PIE
+Central Expressway
+Kranji Highway
+Tampines Expresway      (typo)
+marina                  (partial name)
+```
 
-## Safety and camera matching
+**Dates** — exact, relative, or a named range:
 
-Every query value is a SQLite bound parameter. The query builder interpolates
-only the count of `?` placeholders. The structured object has no mutation verb,
-and the database is read-only. Unsupported, sensitive, unrelated, and mutation
-requests are refused while clarifications preserve conversational state.
+```plaintext
+today / yesterday / last week / this month
+the whole of August
+15th to 18th of last month
+31/08                    (day/month order)
+last Tuesday
+```
 
-Camera names are lowercased, stripped of punctuation and trailing road words,
-then matched against ten stems. Acronyms must be exact. The score floor is
-70 with a 10-point winner/runner-up margin, calibrated against the accepted and
-rejected phrases in the test matrix rather than a separate, arbitrary list of
-typos and non-camera names: real stems score 76 or better against their own
-stem, decoys (Jurong, Serangoon, the expressway, garbled acronyms) top out at
-60, and 70/10 sits in that gap. `tests/test_cameras.py` holds every one of
-those cases, so a threshold change that breaks the calibration fails the suite.
+**Times** — named windows, a bare hour, a range, or overnight:
 
-## Model choice
+```plaintext
+morning / afternoon / evening
+at 3pm
+between 8am and 10am
+between 10pm and 6am     (crosses midnight, handled correctly)
+```
 
-The default is `gemini-3.1-flash-lite`, chosen for availability rather than
-capability: it is what the free Gemini API tier gives me, so it is what the
-whole test matrix was actually run against. Nothing in the code assumes it —
-`GEMINI_MODEL` overrides the default, and the free tier's 500-requests-per-day
-quota is counted per model, which is worth knowing when a full `llm` run costs
-roughly 120 calls.
+**Days of week** — recurring filters:
 
-The task suits a small model: constrained structured extraction into a fixed
-schema, not something that benefits from a multi-step agent. The client uses
-the SDK's Pydantic response-schema support, a five-second minimum call interval,
-retries, and a request timeout.
+```plaintext
+every Tuesday
+weekends / weekdays
+```
 
-The prompt was hardened against 3.1 and 3.5 Flash Lite in turn, and the two
-disagreed enough to be useful: 3.5 dropped `time_to` on named windows, 3.1
-clarified instead of leaving an unmentioned axis unfiltered, and each exposed
-wording the other tolerated. Every fix went in as a general rule, so the prompt
-is stricter than either model alone required. Comparing models needs no
-tooling beyond a `GEMINI_MODEL` prefix on the same `pytest -m llm` command; no
-invented benchmark figures are reported.
+**Combine anything:**
+
+```plaintext
+Show me PIE frames between 8am and 10am yesterday.
+```
+
+**Follow-ups** — it remembers what you asked last turn:
+
+```plaintext
+You:  Show me frames from CTE.
+You:  How about only this week?     → still CTE, now with a date filter
+You:  Only mornings.                → still CTE, still this week, now mornings only
+You:  Show me MCE frames.           → a full new request — starts over
+```
+
+**It will refuse:**
+
+- Anything unrelated to CCTV frames
+- Requests for things the data doesn't hold — images, license plates,\
+  people, vehicle counts
+- Any request to add, change, or delete data
+- Attempts to see its own instructions
+- SQL injection attempts (treated as plain text, never executed)
+
+**It will ask you to clarify** instead of guessing:
+
+- Vague requests ("recent frames", "some frames")
+- Ambiguous references ("the other one", "just the first one")
+- A number with no unit ("frames from 8" — the 8th, or 8 o'clock?)
+
+## Why it's built this way
+
+_This section covers agent architecture, tool/model choices, and the\
+reasoning behind them._
+
+One LLM call, not a multi-step agent
+
+The given task is straightforward: to turn one sentence into a filter with a handful of\
+fields. This doesn't need planning, tool loops, or multi-step reasoning to extract the necessary information, so a single call is simpler, cheaper, faster, and far easier to test than a multi-step agent, and it avoids over-engineering or any unnecessary complexity. Everything after the extraction, such as validation, SQL building, query execution, is plain deterministic Python, so it's reproducible and testable without hitting an API at all in order to manage API costs.
+
+### Model choice
+
+The default model I use is `gemini-3.1-flash-lite`, because it gives the most generous number of requests on the free Gemini API tier, so it's what the whole test\
+suite runs against. Alternative is `gemini-3.5-flash-lite.`
+
+I added client-side rate limiting (a 5-second minimum gap between calls, so at most 12 requests a minute) purely to avoid tripping the free tier's per-minute and per-day quotas. `GEMINI_MODEL` overrides the default if you have a paid key and want to try a bigger model.
+
+This task doesn't need a large model since it is a narrow, structured extraction\
+into a fixed schema. A small, fast, free model is most ideal when considering the speed/complexity trade-off, as well as from an overall cost standpoint.
+
+### Structured LLM output
+
+The Gemini SDK's schema-constrained output (`response_schema` backed by a\
+Pydantic model) forces the model's reply into a fixed shape, in the form of an Intent object that I defined. The model therefore does not write any SQL queries on its own, and its only function is to understand the user's natural language request and product the Intent object, which the rest of the code will subsequently process and write the SQL queries etc.
+
+### Camera matching: fuzzy scoring, calibrated against real cases
+
+The model never resolves a camera name itself, it instead copies whatever\
+span of text the user used, verbatim. A separate, deterministic function\
+(`agent/cameras.py`) then does the matching:
+
+1. Exact acronym ("PIE") matches immediately.
+2. Otherwise, normalize the text, strip the trailing expressway word ("expressway",\
+   "highway", ...), and fuzzy-match it against the 10 known camera names\
+   using `rapidfuzz`.
+3. A match only counts if it clears a **score floor** and beats the\
+   runner-up by a **margin**, so a fuzzy match has to be both good and\
+   unambiguous.
+
+The floor (70) and margin (10) are derived from `agent/calibrate.py` which scores every accepted and rejected phrase in the test matrix against the real\
+camera names and prints where genuine matches and decoys land to infer a reasonable floor and margin between 1st and 2nd choice for highest similarity.
+
+The road-word stripping step itself is also fuzzy-matched (not just an exact\
+set lookup), so a misspelled road word ("expresswy") still gets recognized\
+and stripped correctly, using the same `rapidfuzz` dependency already in\
+the project.
+
+If a phrase can't be resolved to a real camera confidently, the agent asks\
+for clarification instead of guessing or passing a hallucinated value\
+through to the database.
+
+### Follow-ups: model carries over the context
+
+The previous turn's validated intent (not raw chat history) is passed back\
+into every model call as structured data. The prompt explicitly teaches the\
+model to tell an elliptical follow-up ("only this week") which edits the\
+previous filter and keeps everything else, apart from a full new request\
+("show me MCE frames"), which starts over.
+
+### Guardrails
+
+1. **Prompt-level:** explicit refusal rules for off-topic requests, fields\
+   the schema doesn't hold (images, plates, people, vehicle counts), data\
+   mutation requests, and prompt-disclosure attempts, with actual injection\
+   examples worked into the prompt itself (SQL fragments, "ignore previous\
+   instructions"), so the model has seen the exact shape of the attack, and not\
+   just an abstract instruction to resist it.
+2. **Schema-level:** the model's output can only ever contain fields from a\
+   fixed schema. There's no field for SQL or a mutation verb, so there's\
+   nothing for it to misuse even if it wanted to.
+3. **Code-level:** every value that reaches SQL is a bound parameter, never\
+   string-interpolated. The database connection itself is opened read-only\
+   at the SQLite driver level (`mode=ro`), so even a bug elsewhere in the\
+   code physically cannot write to the database.
+4. **Resolver-level:** if the model's camera phrase doesn't match a real\
+   camera closely enough, the agent clarifies rather than letting a\
+   hallucinated value reach the query.
+
+### Testing: fast deterministic tests, separate from slow live-model tests
+
+Tests are split by `pytest` marker. Anything that doesn't need the API, such as\
+camera resolution, SQL building, date formatting, runs in a fraction of a\
+second with no API cost. Anything that needs to check actual model\
+behavior (date/time reasoning, guardrails, follow-ups) is marked `llm` and\
+hits the real Gemini API.
+
+## Repo layout
+
+```plaintext
+cli.py                 The command-line chat loop you run to talk to the agent.
+setup_db.py            Creates the sample CCTV frame database that the agent queries.
+
+agent/
+  intent.py            The shared data shapes: the model's raw output, the
+                        validated request, and the possible results the
+                        agent can return.
+  extract.py           Sends the user's message to Gemini and gets back a
+                        structured request.
+  cameras.py           Matches whatever camera name the user typed to one
+                        of the real cameras.
+  calibrate.py         Dev tool: checks that the camera-matching settings
+                        are tuned correctly.
+  camera_cases.py      Example camera names, typos, and nicknames, with
+                        the camera each should match.
+  query.py             Turns a validated request into a database query,
+                        runs it, and formats the results.
+  session.py           Keeps track of the conversation so follow-up
+                        questions make sense.
+
+tests/
+  conftest.py          Shared setup used by every test: a fixed date/time
+                        and a test-only database.
+  test_cameras.py      Tests that camera names, nicknames, and typos all
+                        resolve to the right camera.
+  test_query.py        Tests that requests turn into correct, safe
+                        database queries.
+  test_extraction.py   Checks that the agent correctly understands dates,
+                        times, and cameras from natural language.
+  test_followups.py    Checks that follow-up messages correctly build on
+                        the previous request.
+  test_guardrails.py   Checks that the agent refuses unsafe, off-topic,
+                        or malicious requests.
+  test_responses.py    Checks that results and clarification questions
+                        are worded clearly.
+
+docs/                  The assignment PDF, plus internal working notes
+                        (spec, test matrix, build progress) kept for
+                        anyone who wants the full history behind this
+                        README.
+```

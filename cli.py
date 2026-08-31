@@ -1,4 +1,4 @@
-"""Interactive loop. The only place datetime.now() is called. See SPEC.md section 14."""
+"""The command-line chat loop you run to talk to the agent."""
 from datetime import datetime
 
 from agent.intent import Clarification, OutOfRange, QueryResult, Refusal

@@ -1,4 +1,4 @@
-"""Response-shape checks for test-matrix.md sections H and I."""
+"""Checks that results and clarification questions are worded clearly."""
 from datetime import date
 
 import pytest

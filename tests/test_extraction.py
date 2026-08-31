@@ -1,7 +1,5 @@
-"""Live Gemini checks for test-matrix.md sections B through E.
-
-The assertion boundary is the validated Intent, never SQL or model prose.
-"""
+"""Checks that the agent correctly understands dates, times, and cameras
+from natural language."""
 from datetime import date, time
 
 import pytest

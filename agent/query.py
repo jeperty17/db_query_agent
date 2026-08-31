@@ -1,4 +1,4 @@
-"""Query builder, execution, result shaping, and validation. See SPEC.md sections 10-12."""
+"""Turns a validated request into a database query, runs it, and formats the results."""
 import sqlite3
 from datetime import date
 
@@ -76,10 +76,10 @@ def run_query(conn, intent):
 
 
 def resolve_intent(extraction, bounds):
-    """Validation: SPEC.md section 10. Turns a raw model Extraction into a
-    validated Intent, or into the Clarification/Refusal/OutOfRange that
-    validation itself produces. Dates and times are already resolved by the
-    model; nothing here interprets a relative expression.
+    """Turns a raw model Extraction into a validated Intent, or into the
+    Clarification/Refusal/OutOfRange that validation itself produces. Dates
+    and times are already resolved by the model; nothing here interprets a
+    relative expression.
     """
     if extraction.action == "refuse":
         return Refusal(message=extraction.message or "This system only queries CCTV frame records.")

@@ -1,6 +1,4 @@
-"""The single model call. See SPEC.md section 7. `now` is always passed in;
-this module never calls datetime.now() itself.
-"""
+"""Sends the user's message to Gemini and gets back a structured request."""
 import os
 import time as _time
 
@@ -152,8 +150,8 @@ def _normalize(extraction):
         value = getattr(extraction, field)
         if value is not None:
             setattr(extraction, field, value.replace(tzinfo=None, second=0, microsecond=0))
-    # ponytail: a lone time_from means the model dropped the window's far end;
-    # closing it at the same clock hour is right for "at 3pm" and the least-wrong
+    # A lone time_from means the model dropped the window's far end; closing
+    # it at the same clock hour is right for "at 3pm" and the least-wrong
     # guess elsewhere. Drop this if a model stops omitting time_to.
     if extraction.time_from and extraction.time_to is None:
         extraction.time_to = extraction.time_from.replace(minute=59)

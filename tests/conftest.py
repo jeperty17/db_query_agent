@@ -1,4 +1,4 @@
-"""Frozen clocks and the session-scoped database fixture. See SPEC.md section 15."""
+"""Shared setup used by every test: a fixed date/time and a test-only database."""
 import sqlite3
 from datetime import date, datetime
 

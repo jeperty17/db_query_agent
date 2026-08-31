@@ -301,21 +301,6 @@ $ python3 -m pytest tests/test_cameras.py -q
 18 passed
 ```
 
-## Phase 13: benchmark runner
-
-Added `benchmark.py`, a small runner for the complete `llm` suite. It runs each
-named Gemini model in a fresh subprocess via `GEMINI_MODEL`, printing its pytest
-pass/fail summary and wall time. It deliberately reuses the matrix tests rather
-than adding a benchmark-only evaluation layer.
-
-Proof:
-```
-$ python3 -m py_compile benchmark.py agent/extract.py
-```
-
-Live comparison is deferred until Gemini connectivity is stable (the same
-environmental failure noted in phases 9-10).
-
 ## Post-phase update: morning convention and Gemini 3.5 Flash-Lite
 
 Confirmed and retained the global morning interval as `06:00-11:59`, including
@@ -323,7 +308,7 @@ follow-up F5. Switched the default model to `gemini-3.5-flash-lite` and made the
 shared extraction limiter a strict five-second minimum interval (at most 12
 requests/minute) for both CLI and the serial pytest suite.
 
-## Phase 14: README
+## Phase 13: README
 
 Added setup, database-generation, run/test, architecture, safety, complete
 date/time convention, model-choice, and threshold-calibration documentation.
