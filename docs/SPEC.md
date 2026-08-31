@@ -20,14 +20,14 @@ This is what makes the system testable, and it is also the main guardrail. A use
 
 ## 2. Stack
 
-| Piece | Choice | Why |
-|---|---|---|
-| Language | Python 3.11+ | `date`, `time` and `datetime` in the standard library cover every date operation needed here. |
-| Database | SQLite, stdlib `sqlite3` | One table, around 700k rows, single user. A server database would add setup steps and no capability. SQLite also supports opening a connection read-only, which is used as a guardrail. |
-| Schemas | `pydantic` | The intent object needs validation and the Gemini SDK can enforce a pydantic schema on the model's output directly, so malformed JSON never reaches the code. |
-| Fuzzy matching | `rapidfuzz` | Used in one function, for camera stems. Fast and has the scorers needed. |
-| Model | Gemini 3.1 Flash Lite, then 3.5 Flash Lite | The task is constrained extraction against a ten-value enum, not hard reasoning, so a small fast model is the right size. Both sit on the free tier, so cost is zero. Start with 3.1 Flash Lite and move up only if the suite shows it dropping cases. |
-| Tests | `pytest` | Parametrised cases map directly onto the test matrix rows. |
+| Piece          | Choice                                     | Why                                                                                                                                                                                                                                                    |
+| -------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Language       | Python 3.11+                               | `date`, `time` and `datetime` in the standard library cover every date operation needed here.                                                                                                                                                          |
+| Database       | SQLite, stdlib `sqlite3`                   | One table, around 700k rows, single user. A server database would add setup steps and no capability. SQLite also supports opening a connection read-only, which is used as a guardrail.                                                                |
+| Schemas        | `pydantic`                                 | The intent object needs validation and the Gemini SDK can enforce a pydantic schema on the model's output directly, so malformed JSON never reaches the code.                                                                                          |
+| Fuzzy matching | `rapidfuzz`                                | Used in one function, for camera stems. Fast and has the scorers needed.                                                                                                                                                                               |
+| Model          | Gemini 3.1 Flash Lite, then 3.5 Flash Lite | The task is constrained extraction against a ten-value enum, not hard reasoning, so a small fast model is the right size. Both sit on the free tier, so cost is zero. Start with 3.1 Flash Lite and move up only if the suite shows it dropping cases. |
+| Tests          | `pytest`                                   | Parametrised cases map directly onto the test matrix rows.                                                                                                                                                                                             |
 
 Keep the dependency list to these four. Nothing else.
 
@@ -248,15 +248,15 @@ These go in the prompt and in the README. The expected values in the test matrix
 
 ### Dates
 
-| Expression | Meaning |
-|---|---|
-| `last` or `this` plus a calendar unit | the calendar unit itself |
-| a number plus a unit | rolling from today |
-| week boundaries | Monday to Sunday |
-| numeric dates | DD/MM |
-| "first week of X" | the 1st to the 7th |
-| "last week of X" | the final 7 days of the month |
-| "last `<weekday>`" | the most recent occurrence before today |
+| Expression                            | Meaning                                 |
+| ------------------------------------- | --------------------------------------- |
+| `last` or `this` plus a calendar unit | the calendar unit itself                |
+| a number plus a unit                  | rolling from today                      |
+| week boundaries                       | Monday to Sunday                        |
+| numeric dates                         | DD/MM                                   |
+| "first week of X"                     | the 1st to the 7th                      |
+| "last week of X"                      | the final 7 days of the month           |
+| "last `<weekday>`"                    | the most recent occurrence before today |
 
 So "last week" is the previous Monday to Sunday, and "the past 7 days" is today minus 6 through today. They are different and both are supported.
 
@@ -264,14 +264,14 @@ So "last week" is the previous Monday to Sunday, and "the past 7 days" is today 
 
 ### Times
 
-| Term | Range |
-|---|---|
+| Term          | Range          |
+| ------------- | -------------- |
 | early morning | 00:00 to 05:59 |
-| morning | 06:00 to 11:59 |
-| lunch | 12:00 to 13:59 |
-| afternoon | 12:00 to 16:59 |
-| evening | 17:00 to 19:59 |
-| night | 20:00 to 23:59 |
+| morning       | 06:00 to 11:59 |
+| lunch         | 12:00 to 13:59 |
+| afternoon     | 12:00 to 16:59 |
+| evening       | 17:00 to 19:59 |
+| night         | 20:00 to 23:59 |
 
 A bare hour like "at 3pm" means that clock hour, 15:00 to 15:59.
 
@@ -371,12 +371,12 @@ The query itself is never narrowed. If a user asks for every Tuesday, the count 
 
 Four types. Each says what happens to conversation state.
 
-| Type | Contents | State |
-|---|---|---|
-| `QueryResult` | total count, date span covered, sample rows, notes | replaced with the new intent |
-| `Clarification` | a question | unchanged |
-| `Refusal` | what the system does support | unchanged |
-| `OutOfRange` | the requested span and the available span | replaced with the new intent |
+| Type            | Contents                                           | State                        |
+| --------------- | -------------------------------------------------- | ---------------------------- |
+| `QueryResult`   | total count, date span covered, sample rows, notes | replaced with the new intent |
+| `Clarification` | a question                                         | unchanged                    |
+| `Refusal`       | what the system does support                       | unchanged                    |
+| `OutOfRange`    | the requested span and the available span          | replaced with the new intent |
 
 State handling is the important part. If a refusal wipes state, every follow-up after one bad input dies. Test F7 covers this.
 
@@ -473,23 +473,19 @@ Follow these phases in order. Each one ends with passing tests and a commit, so 
 
 Maintain `PROGRESS.md` at the repo root. After each phase, append the phase number, what was built, and the test command that proves it. That file is the handover.
 
-| Phase | Build | Done when |
-|---|---|---|
-| 1 | `setup_db.py`, schema, dataset generation | Row count and date span print correctly, rerun appends only missing days |
-| 2 | `agent/intent.py`: Intent, Extraction, and the four outcome types | Imports cleanly, fields match section 5 |
-| 3 | `agent/cameras.py` plus `tests/test_cameras.py` | All of matrix section A passes, no API calls |
-| 4 | `agent/query.py` builder plus `tests/test_query.py` | Hand-built Intent objects produce correct SQL and correct row counts against the real database |
-| 5 | Result shaping and the summary line | Counts, spans and the capped output render correctly |
-| 6 | `agent/extract.py`: schema-enforced model call, prompt, throttling and retry | A single hardcoded message returns a valid Extraction |
-| 7 | Validation: camera resolution, date swap, enum check, data bounds | Wires extraction to a validated Intent |
-| 8 | `agent/session.py` and `cli.py` | A multi-turn conversation runs end to end |
-| 9 | `tests/test_extraction.py`: matrix sections B to E | Common query cases pass |
-| 10 | `tests/test_followups.py` and `test_guardrails.py`: sections F and G | Follow-ups and guardrails pass |
-| 11 | `tests/test_responses.py`: sections H and I | Response shapes and clarifications pass |
-| 12 | Threshold calibration script, section J of the matrix | Floor and margin chosen from data, hard-coded, recorded |
-| 13 | `benchmark.py` | Comparison table prints |
-| 14 | `README.md` | Contains everything in section 17 |
-
-Why this order: phases 1 to 5 involve no model call at all, so the deterministic half of the system is proven correct before the model is introduced. Once the model enters at phase 6, any new failure is the model's, not the plumbing's. That is the same reason the intent object was chosen as the assertion layer in the first place.
-
-Do not skip ahead to the model. A query builder that has never been tested against real rows will produce failures at phase 9 that look like model failures and cost hours to trace.
+| Phase | Build                                                                        | Done when                                                                                      |
+| ----- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| 1     | `setup_db.py`, schema, dataset generation                                    | Row count and date span print correctly, rerun appends only missing days                       |
+| 2     | `agent/intent.py`: Intent, Extraction, and the four outcome types            | Imports cleanly, fields match section 5                                                        |
+| 3     | `agent/cameras.py` plus `tests/test_cameras.py`                              | All of matrix section A passes, no API calls                                                   |
+| 4     | `agent/query.py` builder plus `tests/test_query.py`                          | Hand-built Intent objects produce correct SQL and correct row counts against the real database |
+| 5     | Result shaping and the summary line                                          | Counts, spans and the capped output render correctly                                           |
+| 6     | `agent/extract.py`: schema-enforced model call, prompt, throttling and retry | A single hardcoded message returns a valid Extraction                                          |
+| 7     | Validation: camera resolution, date swap, enum check, data bounds            | Wires extraction to a validated Intent                                                         |
+| 8     | `agent/session.py` and `cli.py`                                              | A multi-turn conversation runs end to end                                                      |
+| 9     | `tests/test_extraction.py`: matrix sections B to E                           | Common query cases pass                                                                        |
+| 10    | `tests/test_followups.py` and `test_guardrails.py`: sections F and G         | Follow-ups and guardrails pass                                                                 |
+| 11    | `tests/test_responses.py`: sections H and I                                  | Response shapes and clarifications pass                                                        |
+| 12    | Threshold calibration script, section J of the matrix                        | Floor and margin chosen from data, hard-coded, recorded                                        |
+| 13    | `benchmark.py`                                                               | Comparison table prints                                                                        |
+| 14    | `README.md`                                                                  | Contains everything in section 17                                                              |
