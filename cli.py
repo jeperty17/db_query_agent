@@ -1,7 +1,7 @@
 """Interactive loop. The only place datetime.now() is called. See SPEC.md section 14."""
 from datetime import datetime
 
-from agent.intent import Clarification, Intent, OutOfRange, QueryResult, Refusal
+from agent.intent import Clarification, OutOfRange, QueryResult, Refusal
 from agent.query import format_summary
 from agent.session import handle_turn, next_state
 

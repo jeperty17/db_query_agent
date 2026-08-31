@@ -1,15 +1,31 @@
 """Frozen clocks and the session-scoped database fixture. See SPEC.md section 15."""
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime
 
 import pytest
 
+from agent.extract import extract
+from agent.intent import Intent
+from agent.query import resolve_intent
 from setup_db import generate
 
 NOW_A = datetime(2026, 8, 30, 14, 30)   # Sunday
 NOW_B = datetime(2026, 8, 19, 9, 0)     # Wednesday
 
 TEST_DB_PATH = "test_frames.db"
+
+BOUNDS = (date(2026, 1, 1), date(2026, 8, 30))
+
+
+def resolved(message, now=NOW_A, prev=None):
+    """One live turn, asserted at the validated-Intent boundary."""
+    return resolve_intent(extract(message, prev, now), BOUNDS)
+
+
+def assert_intent(result, **expected):
+    assert isinstance(result, Intent)
+    for name, value in expected.items():
+        assert getattr(result, name) == value
 
 
 @pytest.fixture(scope="session")

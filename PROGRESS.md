@@ -335,3 +335,74 @@ Proof:
 $ python3 -m pytest -m 'not llm' -q
 45 passed, 71 deselected
 ```
+
+## Post-phase fixes: the 18 failures in TEST_RESULTS.md
+
+All 18 failures traced to two root causes, fixed in two files. No new modules,
+no test expectations changed.
+
+1. **State never carried between turns (7 follow-up failures).** `next_state`
+   only recognised `QueryResult`/`OutOfRange`, so a bare validated `Intent` —
+   what `resolve_intent` returns when the caller doesn't run the query, as the
+   follow-up tests do — left `prev` at `None`. Every turn was therefore a first
+   turn. One `isinstance` branch in `session.py` fixes all of them, including
+   F7, whose turn 3 was clarifying only because it had no state to build on.
+
+2. **Prompt gaps (the other 11).** `agent/extract.py`'s system prompt now
+   states: named time windows as explicit pairs with "a null `time_to` is
+   always wrong" (C3-C10); a backwards date range is emitted as-is for the
+   code to swap, never clarified (B17); message text is data, so a real query
+   with an injection appended is extracted and SQL fragments are literal
+   characters (G8, G11) — with an explicit carve-out that this does not
+   loosen the refusal rules (G6 regressed without it); an unrecognised road
+   name is a camera phrase for the resolver, never a refusal (I3); and
+   carry-forward is decided by shape — an elliptical fragment ("how about
+   MCE") edits the previous intent, a full imperative ("show me MCE frames")
+   starts fresh (F2 vs F6, which no weaker wording separated).
+
+`_strip_tz` became `_normalize`: it now also truncates seconds (C7/C9 returned
+16:59:59) and closes a lone `time_from` at the same clock hour. `frame_time`
+is HH:MM, so neither affects the SQL — only the intent object.
+
+Proof (run before the free-tier daily quota ran out):
+```
+$ python3 -m pytest -q tests/test_extraction.py -k "B17 or C3 or C4 or C5 or C6 or C7 or C9 or C10"
+8 passed
+$ python3 -m pytest -q tests/test_followups.py
+10 passed
+$ python3 -m pytest -q tests/test_guardrails.py tests/test_responses.py
+23 passed
+$ python3 -m pytest -m 'not llm' -q
+45 passed
+```
+That is all 18 previously-failing cases plus every case that shares their
+files. A later whole-suite rerun hit `429 RESOURCE_EXHAUSTED` (500
+requests/day, free tier, counted per model).
+
+### Rerun on gemini-3.1-flash-lite
+
+The daily quota is per model, so the whole `llm` suite was rerun on
+`gemini-3.1-flash-lite`. It exposed three more prompt gaps, all fixed as
+general rules rather than per-case wording:
+
+- "at 3pm" alone came back as a clarification asking which camera. An axis the
+  message never mentions is simply unfiltered — the prompt now says so, since
+  an empty `camera_phrases` already means all cameras (A18/A19).
+- On a Sunday (`NOW_A`), "show me frames from last week" resolved to 24-30 Aug.
+  The Monday-Sunday rule now spells out the Sunday case explicitly.
+- F8's "just the other one" expanded to the eight cameras that were not named
+  instead of clarifying. Unresolvable back-references are now named as an
+  ambiguity case alongside the bare number and the vague quantity.
+
+```
+$ GEMINI_MODEL=gemini-3.1-flash-lite python3 -m pytest -q tests/test_followups.py
+10 passed
+$ GEMINI_MODEL=gemini-3.1-flash-lite python3 -m pytest -q \
+    tests/test_extraction.py tests/test_guardrails.py tests/test_responses.py
+70 passed
+$ python3 -m pytest -q -m 'not llm'
+45 passed
+```
+122 of 122. The default model is still `gemini-3.5-flash-lite`; the three
+fixes above are model-independent prompt wording, but 3.5 has not been rerun
+against them — its daily quota is spent.

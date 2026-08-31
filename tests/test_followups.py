@@ -3,24 +3,14 @@ from datetime import date, time
 
 import pytest
 
-from agent.extract import extract
-from agent.intent import Clarification, Intent, Refusal
-from agent.query import resolve_intent
+from agent.intent import Clarification, Refusal
 from agent.session import next_state
-from tests.conftest import NOW_A
-
-BOUNDS = (date(2026, 1, 1), date(2026, 8, 30))
+from tests.conftest import assert_intent, resolved
 
 
 def turn(message, prev):
-    outcome = resolve_intent(extract(message, prev, NOW_A), BOUNDS)
+    outcome = resolved(message, prev=prev)
     return outcome, next_state(prev, outcome)
-
-
-def assert_fields(outcome, **fields):
-    assert isinstance(outcome, Intent)
-    for name, value in fields.items():
-        assert getattr(outcome, name) == value
 
 
 @pytest.mark.llm
@@ -38,22 +28,22 @@ def test_followups(turns, expected):
     prev = None
     for message, fields in zip(turns, expected):
         outcome, prev = turn(message, prev)
-        assert_fields(outcome, **fields)
+        assert_intent(outcome, **fields)
 
 
 @pytest.mark.llm
 def test_F7_refusal_keeps_prior_state():
     first, prev = turn("show me CTE frames", None)
-    assert_fields(first, camera=["CTE"])
+    assert_intent(first, camera=["CTE"])
     refusal, unchanged = turn("what's the weather", prev)
     assert isinstance(refusal, Refusal) and unchanged == prev
     final, _ = turn("how about yesterday", unchanged)
-    assert_fields(final, camera=["CTE"], date_from=date(2026, 8, 29), date_to=date(2026, 8, 29))
+    assert_intent(final, camera=["CTE"], date_from=date(2026, 8, 29), date_to=date(2026, 8, 29))
 
 
 @pytest.mark.llm
 def test_F8_ambiguity_keeps_prior_state():
     first, prev = turn("show me PIE and CTE frames", None)
-    assert_fields(first, camera=["PIE", "CTE"])
+    assert_intent(first, camera=["PIE", "CTE"])
     outcome, unchanged = turn("just the other one", prev)
     assert isinstance(outcome, Clarification) and unchanged == prev

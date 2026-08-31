@@ -2,6 +2,7 @@
 
 See SPEC.md sections 5, 7, and 12.
 """
+from dataclasses import dataclass, field
 from datetime import date, time
 
 from pydantic import create_model
@@ -33,34 +34,26 @@ Extraction = create_model(
 )
 
 
-class _Outcome:
-    def __eq__(self, other):
-        return type(self) is type(other) and self.__dict__ == other.__dict__
+@dataclass
+class QueryResult:
+    intent: Intent
+    total: int
+    rows: list                       # frame_id, datetime, camera (capped sample)
+    notes: list = field(default_factory=list)
 
 
-class QueryResult(_Outcome):
-    def __init__(self, intent, total, rows, notes=None):
-        self.intent = intent
-        self.total = total
-        self.rows = rows             # frame_id, datetime, camera (capped sample)
-        self.notes = [] if notes is None else notes
+@dataclass
+class Clarification:
+    question: str
 
 
-class Clarification(_Outcome):
-    def __init__(self, question):
-        self.question = question
+@dataclass
+class Refusal:
+    message: str
 
 
-class Refusal(_Outcome):
-    def __init__(self, message):
-        self.message = message
-
-
-class OutOfRange(_Outcome):
-    def __init__(self, intent, requested, available):
-        self.intent = intent
-        self.requested = requested
-        self.available = available
-
-
-Outcome = (QueryResult, Clarification, Refusal, OutOfRange)
+@dataclass
+class OutOfRange:
+    intent: Intent
+    requested: tuple
+    available: tuple

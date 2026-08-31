@@ -22,9 +22,8 @@ ignored by Git. The SQLite connection uses `mode=ro`, so writes fail at the
 driver.
 
 Run deterministic tests with `python3 -m pytest -m 'not llm'`; run model tests
-with `python3 -m pytest -m llm`. `python3 -m agent.calibrate` reproduces the
-camera-threshold calibration. `python3 benchmark.py` runs the live matrix for
-the configured Flash Lite models.
+with `python3 -m pytest -m llm`. To compare models, prefix the same command:
+`GEMINI_MODEL=gemini-3.5-flash-lite python3 -m pytest -m llm`.
 
 ## Conventions
 
@@ -54,15 +53,32 @@ and the database is read-only. Unsupported, sensitive, unrelated, and mutation
 requests are refused while clarifications preserve conversational state.
 
 Camera names are lowercased, stripped of punctuation and trailing road words,
-then matched against ten stems. Acronyms must be exact. Calibration derives its
-scores from the accepted and rejected camera cases in the test matrix, rather
-than from a separate, arbitrary list of typos and non-camera names. The
-hard-coded score floor is 70 with a 10-point winner/runner-up margin.
+then matched against ten stems. Acronyms must be exact. The score floor is
+70 with a 10-point winner/runner-up margin, calibrated against the accepted and
+rejected phrases in the test matrix rather than a separate, arbitrary list of
+typos and non-camera names: real stems score 76 or better against their own
+stem, decoys (Jurong, Serangoon, the expressway, garbled acronyms) top out at
+60, and 70/10 sits in that gap. `tests/test_cameras.py` holds every one of
+those cases, so a threshold change that breaks the calibration fails the suite.
 
 ## Model choice
 
-The default is `gemini-3.5-flash-lite`: this is constrained structured
-extraction, not a task that benefits from a multi-step agent. The client uses
+The default is `gemini-3.1-flash-lite`, chosen for availability rather than
+capability: it is what the free Gemini API tier gives me, so it is what the
+whole test matrix was actually run against. Nothing in the code assumes it —
+`GEMINI_MODEL` overrides the default, and the free tier's 500-requests-per-day
+quota is counted per model, which is worth knowing when a full `llm` run costs
+roughly 120 calls.
+
+The task suits a small model: constrained structured extraction into a fixed
+schema, not something that benefits from a multi-step agent. The client uses
 the SDK's Pydantic response-schema support, a five-second minimum call interval,
-retries, and a request timeout. Run `benchmark.py` to compare it with 3.5 Flash
-Lite using the same test matrix; no invented benchmark figures are reported.
+retries, and a request timeout.
+
+The prompt was hardened against 3.1 and 3.5 Flash Lite in turn, and the two
+disagreed enough to be useful: 3.5 dropped `time_to` on named windows, 3.1
+clarified instead of leaving an unmentioned axis unfiltered, and each exposed
+wording the other tolerated. Every fix went in as a general rule, so the prompt
+is stricter than either model alone required. Comparing models needs no
+tooling beyond a `GEMINI_MODEL` prefix on the same `pytest -m llm` command; no
+invented benchmark figures are reported.

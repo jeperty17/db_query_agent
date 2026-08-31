@@ -3,12 +3,9 @@ from datetime import date
 
 import pytest
 
-from agent.extract import extract
 from agent.intent import Clarification, Intent, OutOfRange
-from agent.query import resolve_intent, run_query
-from tests.conftest import NOW_A
-
-BOUNDS = (date(2026, 1, 1), date(2026, 8, 30))
+from agent.query import run_query
+from tests.conftest import resolved
 
 
 def test_H1_full_range_is_capped(db_conn):
@@ -25,9 +22,7 @@ def test_H2_partial_data_coverage_is_not_clamped(db_conn):
 
 @pytest.mark.llm
 def test_H3_out_of_range_is_not_an_empty_result():
-    result = resolve_intent(
-        extract("show me PIE frames on 1 January 2027", None, NOW_A), BOUNDS
-    )
+    result = resolved("show me PIE frames on 1 January 2027")
     assert isinstance(result, OutOfRange)
 
 
@@ -42,5 +37,5 @@ def test_H4_valid_zero_rows_explains_it(db_conn):
     "show me some frames", "show me CTE frames from 8",
 ])
 def test_ambiguities_clarify(message):
-    result = resolve_intent(extract(message, None, NOW_A), BOUNDS)
+    result = resolved(message)
     assert isinstance(result, Clarification)

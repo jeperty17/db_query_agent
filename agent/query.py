@@ -3,7 +3,7 @@ import sqlite3
 from datetime import date
 
 from agent.cameras import CAMERAS, resolve_camera
-from agent.intent import Clarification, Extraction, Intent, OutOfRange, QueryResult, Refusal
+from agent.intent import Clarification, Intent, OutOfRange, QueryResult, Refusal
 
 SAMPLE_CAP = 50
 _SELECT = "SELECT frame_id, datetime, camera FROM frames"

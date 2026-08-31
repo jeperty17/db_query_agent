@@ -6,6 +6,7 @@ from datetime import date, time
 
 from agent.intent import Clarification, Extraction, Intent, OutOfRange, QueryResult, Refusal
 from agent.query import build_query, format_summary, resolve_intent, run_query
+from tests.conftest import BOUNDS
 
 
 def test_no_filters():
@@ -130,8 +131,6 @@ def test_format_summary_omits_unset_axes():
 
 
 # --- Phase 7: validation (test-matrix.md B17, B22, B23, B14, A21) ---
-
-BOUNDS = (date(2026, 1, 1), date(2026, 8, 30))
 
 
 def test_refuse_passes_through():

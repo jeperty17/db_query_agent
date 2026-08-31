@@ -6,22 +6,8 @@ from datetime import date, time
 
 import pytest
 
-from agent.extract import extract
-from agent.intent import Clarification, Intent, OutOfRange
-from agent.query import resolve_intent
-from tests.conftest import NOW_A, NOW_B
-
-BOUNDS = (date(2026, 1, 1), date(2026, 8, 30))
-
-
-def resolved(message, now):
-    return resolve_intent(extract(message, None, now), BOUNDS)
-
-
-def assert_intent(result, **expected):
-    assert isinstance(result, Intent)
-    for field, value in expected.items():
-        assert getattr(result, field) == value
+from agent.intent import Clarification, OutOfRange
+from tests.conftest import NOW_A, NOW_B, assert_intent, resolved
 
 
 DATE_CASES = [
