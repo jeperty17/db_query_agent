@@ -34,7 +34,6 @@ def main():
             continue
         outcome = handle_turn(message, prev, datetime.now())
         prev = next_state(prev, outcome)
-        print(f"intent: {prev}")
         _print_outcome(outcome)
 
 
